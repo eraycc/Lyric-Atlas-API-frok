@@ -9,14 +9,6 @@
         }
       }
     ],
-    "functions": {
-      "dist/main.js": {
-        "runtime": "nodejs20.x",
-        "memory": 128,
-        "maxDuration": 10,
-        "environment": {}
-      }
-    },
     "rewrites": [
       { "source": "/api/(.*)", "destination": "/dist/main.js" }
     ]
