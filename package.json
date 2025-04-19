@@ -4,10 +4,10 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "tsx watch --require dotenv/config src/main.ts",
-    "build": "esbuild src/main.ts --platform=node --format=esm --outdir=dist --target=node20",
+    "dev": "tsx watch --require dotenv/config src/index.ts",
+    "build": "esbuild src/index.ts --platform=node --format=esm --outdir=dist --target=node20",
     "typecheck": "tsc --noEmit",
-    "start": "node dist/main.js"
+    "start": "node dist/index.js"
   },
   "dependencies": {
     "fastify": "^4.28.1"
