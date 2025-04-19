@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch --require dotenv/config src/index.ts",
-    "build": "esbuild src/index.ts --platform=node --format=esm --outdir=dist --target=node20",
+    "node:build": "esbuild src/index.ts --platform=node --format=esm --outdir=dist --target=node20",
     "typecheck": "tsc --noEmit",
     "start": "node dist/index.js"
   },
