@@ -1,0 +1,13 @@
+{
+    "version": 2,
+    "functions": {
+      "dist/main.js": {
+        "runtime": "nodejs20.x",
+        "memory": 128,
+        "maxDuration": 10
+      }
+    },
+    "rewrites": [
+      { "source": "/api/(.*)", "destination": "/dist/main.js" }
+    ]
+  }
