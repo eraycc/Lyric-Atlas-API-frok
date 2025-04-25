@@ -211,4 +211,16 @@ const start = async () => {
   }
 };
 
-start();
+// Vercel 自动注入 VERCEL 环境变量，若存在则导出 handler 供无服务器函数使用，否则本地/传统环境直接监听端口。
+
+export default async function handler(req: any, res: any) {
+  // 确保 Fastify 实例已就绪
+  await server.ready();
+  // 复用 Fastify 内部的 Node 原生服务器处理请求
+  server.server.emit('request', req, res);
+}
+
+if (!process.env.VERCEL) {
+  // 非 Vercel 环境（本地开发或其他平台）正常启动监听端口
+  start();
+}

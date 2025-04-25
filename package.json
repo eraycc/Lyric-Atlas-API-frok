@@ -5,9 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch --require dotenv/config src/index.ts",
-    "node:build": "esbuild src/index.ts --platform=node --format=esm --outdir=dist --target=node20",
+    "esm:build": "esbuild src/index.ts --platform=node --format=esm --outdir=dist --target=node20",
     "typecheck": "tsc --noEmit",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "swc:build": "swc src/index.ts -o main.js"
   },
   "dependencies": {
     "fastify": "^4.28.1"
@@ -17,6 +18,9 @@
     "dotenv": "^16.4.5",
     "esbuild": "^0.23.1",
     "tsx": "^4.16.2",
-    "typescript": "~5.7.2"
+    "typescript": "~5.7.2",
+    "@swc/core": "^1.4.2",
+    "@swc/cli": "^0.1.62",
+    "@swc/helpers": "^0.5.11"
   }
 }
