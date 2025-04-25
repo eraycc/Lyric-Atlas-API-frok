@@ -11,16 +11,16 @@
     "swc:build": "swc src/index.ts -o main.js"
   },
   "dependencies": {
-    "fastify": "^4.28.1"
+    "fastify": "^4.29.0"
   },
   "devDependencies": {
-    "@types/node": "^20.16.5",
-    "dotenv": "^16.4.5",
+    "@swc/cli": "^0.1.65",
+    "@swc/core": "^1.11.22",
+    "@swc/helpers": "^0.5.17",
+    "@types/node": "^20.17.31",
+    "dotenv": "^16.5.0",
     "esbuild": "^0.23.1",
-    "tsx": "^4.16.2",
-    "typescript": "~5.7.2",
-    "@swc/core": "^1.4.2",
-    "@swc/cli": "^0.1.62",
-    "@swc/helpers": "^0.5.11"
+    "tsx": "^4.19.3",
+    "typescript": "~5.7.3"
   }
 }
