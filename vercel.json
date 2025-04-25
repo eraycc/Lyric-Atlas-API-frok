@@ -1,10 +1,8 @@
 {
     "version": 2,
-    "functions": {
-      "main.js": {
-        "runtime": "nodejs20.x"
-      }
-    },
+    "builds": [
+      { "src": "main.js", "use": "@vercel/node" }
+    ],
     "rewrites": [
       { "source": "/api/(.*)", "destination": "/main.js" }
     ]
