@@ -23,29 +23,22 @@ const server = fastify({ logger: true });
 // 添加一个全局钩子来添加CORS头
 server.addHook('onRequest', (request, reply, done) => {
   // 设置CORS headers
-  reply.header('Access-Control-Allow-Origin', '*');
+  reply.header('Access-Control-Allow-Origin', '*'); // 生产环境请指定具体的源
   reply.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
   reply.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   reply.header('Access-Control-Expose-Headers', 'Content-Range, X-Content-Range');
   reply.header('Access-Control-Allow-Credentials', 'true');
   reply.header('Access-Control-Max-Age', '86400');
 
-  // 如果是预检请求，直接返回200响应
+  // 如果是预检请求，直接返回200响应并结束处理
   if (request.method === 'OPTIONS') {
-    reply.code(200).send();
-    return;
+    server.log.info(`Received OPTIONS request for: ${request.url}`); // 添加日志
+    reply.code(204).send(); // 使用 204 No Content 更符合规范，且可以避免发送空响应体
+    return; // 确保请求在此处结束
   }
   
-  done();
+  done(); // 对于非OPTIONS请求，继续处理
 });
-
-// 添加对OPTIONS请求的明确支持
-server.options('*', async (request, reply) => {
-  return reply.code(200).send();
-});
-
-// Define a regex to match typical LRC/YRC timestamp lines
-// MOVED TO utils.ts
 
 // Helper function to extract valid lyric lines
 // MOVED TO utils.ts
