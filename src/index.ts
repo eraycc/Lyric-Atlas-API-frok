@@ -119,3 +119,12 @@ if (!process.env.VERCEL) {
   // 非 Vercel 环境（本地开发或其他平台）正常启动监听端口
   start();
 }
+
+// 为 /api/search 添加显式的 OPTIONS 路由处理器
+// 即使有 onRequest 钩子，在 Vercel 环境下显式路由可能更可靠
+server.options('/api/search', async (request, reply) => {
+  // CORS 头应该由 onRequest 钩子或 vercel.json 处理
+  // 这里我们只需要确保返回 204 No Content
+  server.log.info(`Explicit OPTIONS handler for /api/search triggered.`);
+  return reply.code(204).send();
+});
