@@ -1,6 +1,7 @@
 import fastify, { FastifyRequest, FastifyReply } from 'fastify';
 import { searchLyrics, SearchResult } from './lyricService.js'; // Import the service with .js extension
 // Removed unused utils imports for now, service handles them
+import cors from '@fastify/cors'; // 导入 CORS 插件
 
 // Define interface for query parameters for better type safety
 interface SearchQuery {
@@ -19,6 +20,17 @@ const EXTERNAL_API_BASE_URL = process.env.EXTERNAL_NCM_API_URL;
 // --- Fastify Server Instance ---
 // Enable logger for development
 const server = fastify({ logger: true });
+
+// 注册 CORS 插件以支持预检请求
+server.register(cors, {
+  // 配置 CORS 选项
+  origin: true, // 允许所有源，或者指定允许的源，如 ['https://example.com']
+  methods: ['GET', 'OPTIONS'], // 允许的 HTTP 方法
+  allowedHeaders: ['Content-Type', 'Authorization'], // 允许的请求头
+  exposedHeaders: ['Content-Range', 'X-Content-Range'], // 暴露给客户端的响应头
+  credentials: true, // 允许跨域请求携带凭证
+  maxAge: 86400, // 预检请求结果缓存时间（秒）
+});
 
 // Define a regex to match typical LRC/YRC timestamp lines
 // MOVED TO utils.ts
