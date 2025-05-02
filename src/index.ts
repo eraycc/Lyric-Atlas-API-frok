@@ -86,11 +86,12 @@ app.get('/api/search', async (c) => {
 });
 
 // --- Vercel Export ---
-// Hono apps can often be directly exported for Vercel
-export default app;
+// Use the adapter for Vercel Node.js runtime as suggested by Hono docs for non-edge cases
+import { handle } from '@hono/node-server/vercel';
 
-// --- Local Development Startup (Optional, if not using Vercel dev) ---
-// Needs @hono/node-server
+export default handle(app);
+
+// --- Local Development Startup (Uses @hono/node-server directly) ---
 
 import { serve } from '@hono/node-server';
 import type { AddressInfo } from 'node:net'; // Import AddressInfo
