@@ -1,4 +1,11 @@
-import { FastifyBaseLogger } from 'fastify';
+// Define a simple logger interface
+interface BasicLogger {
+    info: (...args: any[]) => void;
+    warn: (...args: any[]) => void;
+    error: (...args: any[]) => void;
+    debug?: (...args: any[]) => void; // Optional debug method
+}
+
 import {
   LyricFormat,
   buildRawUrl,
@@ -27,7 +34,7 @@ const EXTERNAL_API_BASE_URL = process.env.EXTERNAL_NCM_API_URL;
 async function fetchRepoLyric(
   id: string,
   format: LyricFormat,
-  logger: FastifyBaseLogger
+  logger: BasicLogger
 ): Promise<FetchResult> {
   const url = buildRawUrl(id, format);
   logger.info(`Attempting fetch from GitHub repo for ${format.toUpperCase()}: ${url}`);
@@ -54,7 +61,7 @@ async function fetchRepoLyric(
 async function fetchExternalLyric(
   id: string,
   specificFormat: 'yrc' | 'lrc' | undefined, // Undefined means try both based on API response
-  logger: FastifyBaseLogger
+  logger: BasicLogger
 ): Promise<FetchResult> {
   const externalUrl = buildExternalApiUrl(id, EXTERNAL_API_BASE_URL);
   logger.info(`Attempting fetch from external API: ${externalUrl}`);
@@ -116,7 +123,7 @@ async function fetchExternalLyric(
 async function handleFixedVersionSearch(
   id: string,
   fixedVersionQuery: LyricFormat, // Already validated
-  logger: FastifyBaseLogger
+  logger: BasicLogger
 ): Promise<SearchResult> {
   logger.info(`LyricService: Handling fixedVersion request for format: ${fixedVersionQuery}`);
 
@@ -150,7 +157,7 @@ async function handleFixedVersionSearch(
 
 async function findTtmlInRepo(
   id: string,
-  logger: FastifyBaseLogger
+  logger: BasicLogger
 ): Promise<SearchResult | null> { // Returns SearchResult if found/error, null if notfound
   logger.info(`LyricService: Attempting TTML from repository.`);
   const ttmlResult = await fetchRepoLyric(id, 'ttml', logger);
@@ -169,7 +176,7 @@ async function findTtmlInRepo(
 async function findInRepoFallbacks(
   id: string,
   fallbackQuery: string | undefined,
-  logger: FastifyBaseLogger
+  logger: BasicLogger
 ): Promise<SearchResult | null> { // Returns SearchResult if found, null otherwise (errors logged)
   let fallbackOrder: LyricFormat[];
   if (fallbackQuery) {
@@ -212,7 +219,7 @@ async function findInRepoFallbacks(
 
 async function findInExternalApi(
   id: string,
-  logger: FastifyBaseLogger
+  logger: BasicLogger
 ): Promise<SearchResult> { // Always returns a SearchResult (found, error, or final notfound)
   logger.info(`LyricService: Trying external API fallback.`);
   const externalResult = await fetchExternalLyric(id, undefined, logger); // undefined -> try yrc, then lrc
@@ -235,7 +242,7 @@ export async function searchLyrics(
   options: {
     fixedVersion?: string;
     fallback?: string;
-    logger: FastifyBaseLogger;
+    logger: BasicLogger;
   }
 ): Promise<SearchResult> {
 

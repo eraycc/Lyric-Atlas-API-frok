@@ -12,14 +12,13 @@
     "swc:build": "swc src/index.ts -o main.js"
   },
   "dependencies": {
-    "@fastify/cors": "^8.5.0",
-    "fastify": "^4.29.0"
+    "hono": "^4.7.8"
   },
   "devDependencies": {
+    "@hono/node-server": "^1.14.1",
     "@swc/cli": "^0.1.65",
     "@swc/core": "^1.11.22",
     "@swc/helpers": "^0.5.17",
-    "@types/fastify-cors": "^2.1.2",
     "@types/node": "^20.17.31",
     "dotenv": "^16.5.0",
     "esbuild": "^0.23.1",

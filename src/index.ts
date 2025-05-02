@@ -1,130 +1,117 @@
-import fastify, { FastifyRequest, FastifyReply } from 'fastify';
-import { searchLyrics, SearchResult } from './lyricService.js'; // Import the service with .js extension
-// Removed unused utils imports for now, service handles them
-
-// Define interface for query parameters for better type safety
-interface SearchQuery {
-  id?: string;
-  fallback?: string;
-  fixedVersion?: string;
-}
-
-// --- Allowed Formats & Helper ---
-// MOVED TO utils.ts
+import { Hono } from 'hono';
+import { cors } from 'hono/cors';
+import { searchLyrics, SearchResult } from './lyricService.js'; // Import the existing service
 
 // --- Read External API URL from Environment Variable ---
 const EXTERNAL_API_BASE_URL = process.env.EXTERNAL_NCM_API_URL;
-// This should be checked at startup
 
-// --- Fastify Server Instance ---
-// Enable logger for development
-const server = fastify({ logger: true });
+// --- CHECK REQUIRED ENV VARS at startup (conceptual) ---
+if (!EXTERNAL_API_BASE_URL) {
+  console.error("FATAL ERROR: Required environment variable EXTERNAL_NCM_API_URL is not set.");
+  // In a real app, you might throw an error or exit differently depending on context
+  // For Vercel, functions might start anyway, so runtime checks are also good.
+}
 
-// 添加一个全局钩子来添加CORS头
-server.addHook('onRequest', (request, reply, done) => {
-  // 设置CORS headers
-  reply.header('Access-Control-Allow-Origin', '*'); // 生产环境请指定具体的源
-  reply.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  reply.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  reply.header('Access-Control-Expose-Headers', 'Content-Range, X-Content-Range');
-  reply.header('Access-Control-Allow-Credentials', 'true');
-  reply.header('Access-Control-Max-Age', '86400');
+// --- Hono App Instance ---
+const app = new Hono();
 
-  // 如果是预检请求，直接返回200响应并结束处理
-  if (request.method === 'OPTIONS') {
-    server.log.info(`Received OPTIONS request for: ${request.url}`); // 添加日志
-    reply.code(204).send(); // 使用 204 No Content 更符合规范，且可以避免发送空响应体
-    return; // 确保请求在此处结束
+// --- Logger Shim (Matches BasicLogger in lyricService.ts) ---
+// Simple logger adapter implementing the BasicLogger interface
+const consoleLoggerShim = {
+    info: (...args: any[]) => console.info(...args),
+    warn: (...args: any[]) => console.warn(...args),
+    error: (...args: any[]) => console.error(...args),
+    // Optional debug, map to console.debug or console.log
+    debug: (...args: any[]) => console.debug ? console.debug(...args) : console.log('[DEBUG]', ...args),
+    // Add other methods if BasicLogger requires them, otherwise they are implicitly undefined
+};
+
+// --- CORS Middleware ---
+// Configure CORS using Hono's built-in middleware
+// Match the settings previously in vercel.json
+app.use('/api/*', cors({
+  origin: '*', // Or specify allowed origins: ['https://example.com']
+  allowMethods: ['GET', 'OPTIONS'],
+  allowHeaders: ['Content-Type', 'Authorization'],
+  exposeHeaders: ['Content-Range', 'X-Content-Range'],
+  maxAge: 86400,
+  credentials: true,
+}));
+
+// --- API Endpoint: /api/search ---
+app.get('/api/search', async (c) => {
+  const id = c.req.query('id');
+  const fallbackQuery = c.req.query('fallback');
+  const fixedVersionRaw = c.req.query('fixedVersion');
+
+  // Re-check required env var at runtime as well
+  if (!EXTERNAL_API_BASE_URL) {
+      console.error("RUNTIME ERROR: EXTERNAL_NCM_API_URL is not set.");
+      c.status(500);
+      return c.json({ found: false, id, error: 'Server configuration error.' });
   }
-  
-  done(); // 对于非OPTIONS请求，继续处理
-});
-
-// Helper function to extract valid lyric lines
-// MOVED TO utils.ts
-
-// --- API Endpoint ---
-// Register route with query parameter typing
-server.get<{ Querystring: SearchQuery }>('/api/search', async (request: FastifyRequest<{ Querystring: SearchQuery }>, reply: FastifyReply) => {
-  const { id, fallback: fallbackQuery, fixedVersion: fixedVersionRaw } = request.query;
 
   if (!id) {
-    // Use Fastify's reply object to send response with status code
-    return reply.code(400).send({ error: 'Missing id parameter' });
+    c.status(400);
+    return c.json({ found: false, error: 'Missing id parameter' });
   }
 
-  server.log.info(`API: Received request for ID: ${id}, fixed: ${fixedVersionRaw}, fallback: ${fallbackQuery}`);
+  console.log(`Hono API: Received request for ID: ${id}, fixed: ${fixedVersionRaw}, fallback: ${fallbackQuery}`);
 
   try {
-    // Call the lyric service to handle fetching and fallbacks
+    // Call the lyric service, passing the shim logger
     const result: SearchResult = await searchLyrics(id, {
-      fixedVersion: fixedVersionRaw, // Pass raw string, service will handle validation/case
+      fixedVersion: fixedVersionRaw,
       fallback: fallbackQuery,
-      logger: server.log // Pass logger instance
+      logger: consoleLoggerShim // Pass the shim logger
     });
 
-    // Send response based on service result
     if (result.found) {
-      server.log.info(`API: Found lyrics for ID: ${id}, Format: ${result.format}, Source: ${result.source}`);
-      // Service returns the exact structure needed for the success response
-      return reply.send(result);
+      console.log(`Hono API: Found lyrics for ID: ${id}, Format: ${result.format}, Source: ${result.source}`);
+      return c.json(result);
     } else {
-      // Service returns structure needed for error response (found: false, id, error, statusCode?)
-      const statusCode = result.statusCode || 404; // Default to 404 if service doesn't provide specific error code
-      server.log.info(`API: Lyrics not found or error for ID: ${id}. Status: ${statusCode}, Error: ${result.error}`);
-      return reply.code(statusCode).send(result);
+      const statusCode = result.statusCode || 404;
+      console.log(`Hono API: Lyrics not found or error for ID: ${id}. Status: ${statusCode}, Error: ${result.error}`);
+      // Directly use the number; Hono status accepts number for valid codes
+      c.status(statusCode as any); // Use 'as any' for quick fix if TS complains, or ensure statusCode is a valid number type Hono accepts
+      return c.json(result);
     }
 
   } catch (error) {
-    // Catch unexpected errors ONLY during the API handler execution (service should handle its own errors)
-    server.log.error({ msg: `Unexpected error during API handler execution for ID: ${id}`, error });
+    console.error({ msg: `Unexpected error during API handler execution for ID: ${id}`, error });
     const errorMessage = error instanceof Error ? error.message : 'Unknown processing error';
-    // Return a generic 500 error for unexpected issues in the handler itself
-    return reply.code(500).send({ found: false, id, error: `Failed to process lyric request: ${errorMessage}` });
+    c.status(500);
+    return c.json({ found: false, id, error: `Failed to process lyric request: ${errorMessage}` });
   }
 });
 
-// Helper function to fetch from GitHub Repo
-// MOVED TO lyricService.ts
+// --- Vercel Export ---
+// Hono apps can often be directly exported for Vercel
+export default app;
 
-// --- Server Startup Logic ---
-const start = async () => {
-  // --- CHECK REQUIRED ENV VARS ---
-  if (!EXTERNAL_API_BASE_URL) {
-    console.error("FATAL ERROR: Required environment variable EXTERNAL_NCM_API_URL is not set.");
-    process.exit(1); // Exit if required config is missing
-  }
-  console.log(`Using external API URL: ${EXTERNAL_API_BASE_URL}`); // Log after confirmation
+// --- Local Development Startup (Optional, if not using Vercel dev) ---
+// Needs @hono/node-server
 
+import { serve } from '@hono/node-server';
+import type { AddressInfo } from 'node:net'; // Import AddressInfo
+
+if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
+  console.log(`Using external API URL: ${EXTERNAL_API_BASE_URL}`);
   const port = parseInt(process.env.PORT || '3000', 10);
-  try {
-    await server.listen({ port: port, host: '0.0.0.0' });
-    // Logger will automatically print the address
-  } catch (err) {
-    server.log.error(err);
-    process.exit(1);
-  }
-};
 
-// Vercel 自动注入 VERCEL 环境变量，若存在则导出 handler 供无服务器函数使用，否则本地/传统环境直接监听端口。
+  const server = serve({
+    fetch: app.fetch,
+    port: port
+  }, (info: AddressInfo) => { // Add info parameter with type
+    console.log(`Server is running on http://localhost:${info.port}`); // Use info.port
+  });
 
-export default async function handler(req: any, res: any) {
-  // 确保 Fastify 实例已就绪
-  await server.ready();
-  // 复用 Fastify 内部的 Node 原生服务器处理请求
-  server.server.emit('request', req, res);
+  // Optional: Add graceful shutdown
+  process.on('SIGINT', () => {
+    console.log('\nGracefully shutting down...');
+    server.close(() => {
+      console.log('Server closed.');
+      process.exit(0);
+    });
+  });
 }
-
-if (!process.env.VERCEL) {
-  // 非 Vercel 环境（本地开发或其他平台）正常启动监听端口
-  start();
-}
-
-// 为 /api/search 添加显式的 OPTIONS 路由处理器
-// 即使有 onRequest 钩子，在 Vercel 环境下显式路由可能更可靠
-server.options('/api/search', async (request, reply) => {
-  // CORS 头应该由 onRequest 钩子或 vercel.json 处理
-  // 这里我们只需要确保返回 204 No Content
-  server.log.info(`Explicit OPTIONS handler for /api/search triggered.`);
-  return reply.code(204).send();
-});
