@@ -1,6 +1,6 @@
-export type LyricFormat = 'ttml' | 'yrc' | 'lrc' | 'eslrc' | 'tlyric';
+export type LyricFormat = 'ttml' | 'yrc' | 'lrc' | 'eslrc' | 'tlyric' | 'romalrc';
 
-export const ALLOWED_FORMATS: LyricFormat[] = ['ttml', 'yrc', 'lrc', 'eslrc', 'tlyric'];
+export const ALLOWED_FORMATS: LyricFormat[] = ['ttml', 'yrc', 'lrc', 'eslrc', 'tlyric', 'romalrc'];
 
 // Default *fallback* order, excluding ttml initially
 export const DEFAULT_FALLBACK_ORDER: LyricFormat[] = ['yrc', 'lrc', 'eslrc'];

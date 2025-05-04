@@ -23,7 +23,7 @@ export type FetchResult =
 
 // Result type for the main search function
 export type SearchResult =
-  | { found: true; id: string; format: LyricFormat; source: 'repository' | 'external'; content: string; translation?: string }
+  | { found: true; id: string; format: LyricFormat; source: 'repository' | 'external'; content: string; translation?: string; romaji?: string }
   | { found: false; id: string; error: string; statusCode?: number };
 
 // Environment variable (should be passed in or handled differently in a real service)
@@ -62,7 +62,7 @@ async function fetchExternalLyric(
   id: string,
   specificFormat: 'yrc' | 'lrc' | undefined, // Undefined means try both based on API response
   logger: BasicLogger
-): Promise<FetchResult & { translation?: string }> {
+): Promise<FetchResult & { translation?: string; romaji?: string }> {
   const externalUrl = buildExternalApiUrl(id, EXTERNAL_API_BASE_URL);
   logger.info(`Attempting fetch from external API: ${externalUrl}`);
 
@@ -87,29 +87,34 @@ async function fetchExternalLyric(
     const translation = translationRaw === null ? undefined : translationRaw;
     logger.info(`Translation lyrics ${translation ? 'found' : 'not found'} in external API response.`);
 
+    // 获取罗马音歌词
+    const romajiRaw = filterLyricLines(externalData?.romalrc?.lyric);
+    const romaji = romajiRaw === null ? undefined : romajiRaw;
+    logger.info(`Romaji lyrics ${romaji ? 'found' : 'not found'} in external API response.`);
+
     // Prioritize specific format if requested
     if (specificFormat === 'yrc') {
       const filteredContent = filterLyricLines(externalData?.yrc?.lyric);
       if (filteredContent) {
         logger.info(`Found and filtered YRC lyrics in external API for ID: ${id}.`);
-        return { status: 'found', format: 'yrc', source: 'external', content: filteredContent, translation };
+        return { status: 'found', format: 'yrc', source: 'external', content: filteredContent, translation, romaji };
       }
     } else if (specificFormat === 'lrc') {
         const filteredContent = filterLyricLines(externalData?.lrc?.lyric);
         if (filteredContent) {
           logger.info(`Found and filtered LRC lyrics in external API for ID: ${id}.`);
-          return { status: 'found', format: 'lrc', source: 'external', content: filteredContent, translation };
+          return { status: 'found', format: 'lrc', source: 'external', content: filteredContent, translation, romaji };
         }
     } else { // No specific format requested, try yrc then lrc
        const filteredYrc = filterLyricLines(externalData?.yrc?.lyric);
        if (filteredYrc) {
          logger.info(`Found and filtered YRC lyrics (default) in external API for ID: ${id}.`);
-         return { status: 'found', format: 'yrc', source: 'external', content: filteredYrc, translation };
+         return { status: 'found', format: 'yrc', source: 'external', content: filteredYrc, translation, romaji };
        }
        const filteredLrc = filterLyricLines(externalData?.lrc?.lyric);
        if (filteredLrc) {
          logger.info(`Found and filtered LRC lyrics (fallback) in external API for ID: ${id}.`);
-         return { status: 'found', format: 'lrc', source: 'external', content: filteredLrc, translation };
+         return { status: 'found', format: 'lrc', source: 'external', content: filteredLrc, translation, romaji };
        }
     }
 
@@ -153,7 +158,8 @@ async function handleFixedVersionSearch(
         format: externalResult.format, 
         source: 'external', 
         content: externalResult.content,
-        translation: externalResult.translation 
+        translation: externalResult.translation,
+        romaji: externalResult.romaji
       };
     }
     if (externalResult.status === 'error') {
@@ -243,7 +249,8 @@ async function findInExternalApi(
       format: externalResult.format, 
       source: 'external', 
       content: externalResult.content,
-      translation: externalResult.translation 
+      translation: externalResult.translation,
+      romaji: externalResult.romaji
     };
   }
   if (externalResult.status === 'error') {

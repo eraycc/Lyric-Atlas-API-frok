@@ -72,6 +72,10 @@ app.get('/api/search', async (c) => {
       if (result.translation) {
         console.log(`Hono API: Translation lyrics also found and included in response.`);
       }
+      // 记录罗马音歌词
+      if (result.romaji) {
+        console.log(`Hono API: Romaji lyrics also found and included in response.`);
+      }
       return c.json(result);
     } else {
       const statusCode = result.statusCode || 404;
