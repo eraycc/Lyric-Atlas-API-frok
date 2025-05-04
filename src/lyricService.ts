@@ -152,11 +152,11 @@ async function handleFixedVersionSearch(
     logger.info(`LyricService: Fixed ${fixedVersionQuery} not in repo, trying external.`);
     const externalResult = await fetchExternalLyric(id, fixedVersionQuery, logger);
     if (externalResult.status === 'found') {
-      return { 
-        found: true, 
-        id, 
-        format: externalResult.format, 
-        source: 'external', 
+      return {
+        found: true,
+        id,
+        format: externalResult.format,
+        source: 'external',
         content: externalResult.content,
         translation: externalResult.translation,
         romaji: externalResult.romaji
@@ -174,65 +174,75 @@ async function handleFixedVersionSearch(
   return { found: false, id, error: `Lyrics not found for fixed format: ${fixedVersionQuery}`, statusCode: 404 };
 }
 
-async function findTtmlInRepo(
-  id: string,
-  logger: BasicLogger
-): Promise<SearchResult | null> { // Returns SearchResult if found/error, null if notfound
-  logger.info(`LyricService: Attempting TTML from repository.`);
-  const ttmlResult = await fetchRepoLyric(id, 'ttml', logger);
-  if (ttmlResult.status === 'found') {
-    return { found: true, id, format: ttmlResult.format, source: 'repository', content: ttmlResult.content };
-  }
-  if (ttmlResult.status === 'error') {
-    // If fetching primary format fails, return error immediately
-    return { found: false, id, error: `Failed to fetch primary format TTML: ${ttmlResult.error.message}`, statusCode: ttmlResult.statusCode };
-  }
-  // TTML not found
-  logger.info(`LyricService: TTML not found in repository.`);
-  return null;
-}
-
-async function findInRepoFallbacks(
+/**
+ * Fetches all specified repository formats (TTML + fallbacks) in parallel.
+ * Returns the first found result according to priority (TTML > fallback order),
+ * or null if none are found. Logs errors encountered during fetches.
+ */
+async function findAllInRepo(
   id: string,
   fallbackQuery: string | undefined,
   logger: BasicLogger
-): Promise<SearchResult | null> { // Returns SearchResult if found, null otherwise (errors logged)
-  let fallbackOrder: LyricFormat[];
+): Promise<SearchResult | null> {
+  let formatsToCheck: LyricFormat[] = ['ttml']; // Always check TTML first
+  let specifiedFallbacks: LyricFormat[] = [];
+
   if (fallbackQuery) {
-    fallbackOrder = fallbackQuery.split(',')
+    specifiedFallbacks = fallbackQuery.split(',')
       .map((f: string) => f.trim().toLowerCase())
-      .filter((f): f is LyricFormat => isValidFormat(f) && f !== 'ttml');
-    if (fallbackOrder.length === 0 && fallbackQuery.split(',').length > 0) {
-      logger.warn(`LyricService: Fallback query ("${fallbackQuery}") resulted in no valid formats.`);
+      .filter((f): f is LyricFormat => isValidFormat(f) && f !== 'ttml'); // Exclude ttml from fallbacks
+    if (specifiedFallbacks.length === 0 && fallbackQuery.split(',').length > 0) {
+      logger.warn(`LyricService: Fallback query ("${fallbackQuery}") resulted in no valid non-TTML formats.`);
     }
+    formatsToCheck.push(...specifiedFallbacks);
   } else {
-    fallbackOrder = DEFAULT_FALLBACK_ORDER;
+    // Add default fallbacks, excluding ttml if it's already there (which it always is)
+    formatsToCheck.push(...DEFAULT_FALLBACK_ORDER.filter(f => f !== 'ttml'));
   }
 
-  if (fallbackOrder.length === 0) {
-     logger.info(`LyricService: No valid repository fallback formats to check.`);
+  // Remove duplicates just in case, though logic should prevent 'ttml' duplication
+  formatsToCheck = [...new Set(formatsToCheck)];
+
+  if (formatsToCheck.length === 0) {
+     logger.info(`LyricService: No valid repository formats to check.`);
      return null;
   }
 
-  logger.info(`LyricService: Fetching repository fallbacks in parallel: ${fallbackOrder.join(', ')}`);
-  const fallbackPromises = fallbackOrder.map(format => fetchRepoLyric(id, format, logger));
-  const fallbackResults = await Promise.allSettled(fallbackPromises);
+  logger.info(`LyricService: Fetching repository formats in parallel: ${formatsToCheck.join(', ')}`);
+  const fetchPromises = formatsToCheck.map(format => fetchRepoLyric(id, format, logger));
+  const results = await Promise.allSettled(fetchPromises);
 
-  for (let i = 0; i < fallbackOrder.length; i++) {
-    const format = fallbackOrder[i];
-    const result = fallbackResults[i];
-    if (result.status === 'fulfilled' && result.value.status === 'found') {
-      logger.info(`LyricService: Found repo fallback ${format.toUpperCase()} via parallel fetch.`);
-      return { found: true, id, format: result.value.format, source: 'repository', content: result.value.content };
-    } else if (result.status === 'fulfilled' && result.value.status === 'error') {
-      logger.error(`LyricService: Error fetching repo fallback ${format.toUpperCase()}: ${result.value.error.message}`, result.value.error);
-    } else if (result.status === 'rejected') {
-      logger.error(`LyricService: Promise rejected for repo fallback ${format.toUpperCase()}: ${result.reason}`, result.reason);
-    }
-    // 'notfound' status is logged within fetchRepoLyric or implicitly handled by loop continuing
+  // Map results for easier lookup, store only successful fetches or errors
+  const resultMap = new Map<LyricFormat, FetchResult>();
+  results.forEach((result, index) => {
+      const format = formatsToCheck[index];
+      if (result.status === 'fulfilled') {
+          // Log errors here for context, even if fetchRepoLyric also logged
+          if (result.value.status === 'error') {
+              logger.error(`LyricService: Error fetching repo format ${format.toUpperCase()} during parallel check: ${result.value.error.message}`, result.value.error);
+          }
+           // Store found, notfound, or error results from fulfilled promises
+          resultMap.set(format, result.value);
+      } else {
+          // Log rejected promises
+          logger.error(`LyricService: Promise rejected for repo format ${format.toUpperCase()}: ${result.reason}`, result.reason);
+          // Optionally store a synthetic error result
+          // resultMap.set(format, { status: 'error', format, error: new Error(`Promise rejected: ${result.reason}`) });
+      }
+  });
+
+
+  // Iterate through the desired order (formatsToCheck) to find the first success
+  for (const format of formatsToCheck) {
+      const fetchResult = resultMap.get(format);
+      if (fetchResult?.status === 'found') {
+          logger.info(`LyricService: Found repository format ${format.toUpperCase()} via parallel fetch.`);
+          return { found: true, id, format: fetchResult.format, source: 'repository', content: fetchResult.content };
+      }
+      // 'notfound' or 'error' statuses mean we continue to the next format in the priority list
   }
 
-  logger.info(`LyricService: Parallel repository fallbacks complete, none found.`);
+  logger.info(`LyricService: Parallel repository fetches complete, no format found.`);
   return null; // None found
 }
 
@@ -285,18 +295,52 @@ export async function searchLyrics(
   // --- Standard Search Flow (No valid fixedVersion) ---
   logger.info(`LyricService: Starting standard search flow.`);
 
-  // 2. Try TTML from repository
-  const ttmlResult = await findTtmlInRepo(id, logger);
-  if (ttmlResult) { // Returns SearchResult if found or error, null if not found
-    return ttmlResult;
+  // 2. Start repository and external API checks in parallel
+  logger.info(`LyricService: Starting parallel checks for repository and external API.`);
+  const repoPromise = findAllInRepo(id, fallbackQuery, logger);
+  const externalApiPromise = findInExternalApi(id, logger);
+
+  // Wait for both promises to settle
+  const [repoResultSettled, externalApiResultSettled] = await Promise.allSettled([
+    repoPromise,
+    externalApiPromise
+  ]);
+
+  // 3. Prioritize Repository Result
+  if (repoResultSettled.status === 'fulfilled' && repoResultSettled.value?.found) {
+    logger.info('LyricService: Prioritizing result found in repository.');
+    return repoResultSettled.value; // Found in repo, return immediately
   }
 
-  // 3. Try repository fallbacks (parallel)
-  const repoFallbackResult = await findInRepoFallbacks(id, fallbackQuery, logger);
-  if (repoFallbackResult) { // Returns SearchResult if found, null otherwise
-    return repoFallbackResult;
-  }
+   // Log repository outcome if it didn't yield a usable result
+   if (repoResultSettled.status === 'rejected') {
+     logger.error('LyricService: Repository check promise was rejected.', repoResultSettled.reason);
+   } else if (repoResultSettled.value && !repoResultSettled.value.found) {
+       // Repo search completed but found nothing or had an error handled within findAllInRepo (returned SearchResult{found:false})
+      logger.info(`LyricService: Repository check completed but found no lyrics (or encountered an error): ${repoResultSettled.value.error}`);
+   } else if (repoResultSettled.value === null) {
+       // This case handles when findAllInRepo explicitly returns null (e.g., no valid formats to check)
+       logger.info('LyricService: Repository check found no applicable formats or lyrics.');
+   }
 
-  // 4. Try External API fallback (always returns a SearchResult)
-  return findInExternalApi(id, logger);
+  // 4. Fallback to External API Result
+  logger.info('LyricService: Repository check did not yield results, evaluating external API outcome.');
+  if (externalApiResultSettled.status === 'fulfilled') {
+    logger.info(`LyricService: External API check promise fulfilled, returning its result (found: ${externalApiResultSettled.value.found}).`);
+    return externalApiResultSettled.value; // Return external result (found, notfound, or error)
+  } else {
+    // External API promise was rejected
+    logger.error('LyricService: External API check promise was rejected.', externalApiResultSettled.reason);
+    // Construct a final error message reflecting both failures if necessary
+    let repoErrorMsg = 'Repository check failed or found nothing.';
+    if (repoResultSettled.status === 'fulfilled' && repoResultSettled.value && !repoResultSettled.value.found) {
+        repoErrorMsg = `Repository check failed: ${repoResultSettled.value.error}`;
+    }
+    return {
+        found: false,
+        id,
+        error: `Both repository and external API checks failed. Repo: ${repoErrorMsg} External API Error: ${externalApiResultSettled.reason?.message || 'Unknown rejection reason'}`,
+        statusCode: 500 // Indicate a general server-side failure
+    };
+  }
 } 
