@@ -68,14 +68,20 @@ app.get('/api/search', async (c) => {
 
     if (result.found) {
       console.log(`Hono API: Found lyrics for ID: ${id}, Format: ${result.format}, Source: ${result.source}`);
-      // 同时返回翻译歌词（如果有）
-      if (result.translation) {
-        console.log(`Hono API: Translation lyrics also found and included in response.`);
-      }
-      // 记录罗马音歌词
-      if (result.romaji) {
-        console.log(`Hono API: Romaji lyrics also found and included in response.`);
-      }
+      // 使用三元运算符记录翻译歌词状态
+      console.log(
+        result.translation
+          ? `Hono API: Translation lyrics also found and included in response.`
+          : `Hono API: Translation lyrics not found.`
+      );
+      // 使用三元运算符记录罗马音歌词状态
+      console.log(
+        result.romaji
+          ? `Hono API: Romaji lyrics also found and included in response.`
+          : `Hono API: Romaji lyrics not found.`
+      );
+      // Return the result based on the requested format
+      c.header('Content-Type', result.format === 'yrc' ? 'application/json' : 'text/plain');
       return c.json(result);
     } else {
       const statusCode = result.statusCode || 404;
