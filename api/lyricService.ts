@@ -109,8 +109,8 @@ export class LyricProvider {
             controller.signal.addEventListener('abort', () => {
               reject(controller.signal.reason || new Error(`${taskName} aborted by global timeout`));
             });
-          })
-        ]);
+        })
+      ]);
       };
 
       const [repoResultSettled, externalApiResultSettled] = await Promise.allSettled([
@@ -192,7 +192,7 @@ export class LyricProvider {
         // 如果是超时错误，状态码设为 408
         if (controller.signal.reason === repoResultSettled.reason || (repoResultSettled.reason as Error)?.name === 'AbortError' || String(repoResultSettled.reason).toLowerCase().includes('timeout')) {
             finalStatusCode = 408;
-        } else {
+      } else {
             finalStatusCode = (repoResultSettled.reason as any)?.statusCode || 500; // 其他拒绝原因，尝试获取状态码或默认为500
         }
       }
@@ -279,7 +279,7 @@ export class LyricProvider {
         lyricsCache.set(cacheKey, result);
         return result;
       }
-
+      
       // 其次外部API结果
       if (externalFetchResultSettled.status === 'fulfilled' && externalFetchResultSettled.value.status === 'found') {
         const externalFetchResult = externalFetchResultSettled.value;
@@ -344,36 +344,36 @@ export class LyricProvider {
       try {
         const repoResult = await this.repoFetcher.fetch(id, fixedVersionQuery);
         if (repoResult.status === 'found') {
-          const result: SearchResult = { 
-            found: true as const, 
-            id, 
+            const result: SearchResult = {
+              found: true as const,
+              id,
             format: repoResult.format, 
             source: 'repository', 
             content: repoResult.content 
-          };
-          lyricsCache.set(cacheKey, result);
-          return result;
-        }
-        
+            };
+            lyricsCache.set(cacheKey, result);
+            return result;
+          }
+          
         if (repoResult.status === 'error') {
-          return { 
-            found: false, 
-            id, 
+            return { 
+              found: false, 
+              id, 
             error: `Repo fetch failed for fixed format ${fixedVersionQuery}: ${repoResult.error.message}`, 
             statusCode: repoResult.statusCode 
           };
         }
         // status === 'notfound'
-        return { found: false, id, error: `Lyrics not found for fixed format: ${fixedVersionQuery}`, statusCode: 404 };
-      } catch (error) {
-        const err = error instanceof Error ? error : new Error(String(error));
+      return { found: false, id, error: `Lyrics not found for fixed format: ${fixedVersionQuery}`, statusCode: 404 };
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
         logger.error(`LyricProvider: Unexpected error during repo-only fixed format search for ${fixedVersionQuery}: ${err.message}`);
-        return { 
-          found: false, 
-          id, 
-          error: `Unexpected error during search: ${err.message}`, 
-          statusCode: 500 
-        };
+      return { 
+        found: false, 
+        id, 
+        error: `Unexpected error during search: ${err.message}`, 
+        statusCode: 500 
+      };
       }
     }
   }
@@ -435,16 +435,16 @@ export class LyricProvider {
           }
 
           if (formatToFetch) {
-            // 获取具体内容
+          // 获取具体内容
             const fetchResult = await this.repoFetcher.fetch(id, formatToFetch);
-            if (fetchResult.status === 'found') {
-              return { 
-                found: true as const, 
-                id, 
-                format: fetchResult.format, 
-                source: 'repository', 
-                content: fetchResult.content 
-              };
+          if (fetchResult.status === 'found') {
+            return { 
+              found: true as const, 
+              id, 
+              format: fetchResult.format, 
+              source: 'repository', 
+              content: fetchResult.content 
+            };
             } else {
               logger.warn(`LyricProvider: Worker indicated ${formatToFetch} was available, but subsequent fetch failed or was not found.`);
             }
