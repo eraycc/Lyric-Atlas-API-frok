@@ -1,5 +1,5 @@
-const { parentPort } = require('worker_threads');
-const http2 = require('http2');
+import { parentPort } from 'worker_threads';
+import { connect } from 'http2';
 
 // 如果没有parentPort，说明不是在工作线程中运行
 if (!parentPort) {
@@ -20,7 +20,7 @@ function getConnection(origin) {
     connectionCache.delete(origin);
   }
 
-  const client = http2.connect(origin);
+  const client = connect(origin);
   
   client.on('error', (err) => {
     console.warn(`[Worker] HTTP/2 connection error: ${err.message}`);
