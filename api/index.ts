@@ -4,14 +4,25 @@ import { handle } from 'hono/vercel';
 import { cors } from 'hono/cors';
 import { LyricProvider, type SearchResult, searchLyrics, getLyricMetadata, LyricMetadataResult } from './lyricService';
 import { getLogger } from './utils';
-import { prettyJSON } from 'hono/pretty-json'
+import { prettyJSON } from 'hono/pretty-json';
+import { setupCacheCleanup } from './cache';
 
 // Create a logger instance for the API entrypoint
 const apiLogger = getLogger('API');
 
+// 显式声明Edge Runtime
+export const runtime = 'edge';
+
+// 配置最接近的边缘区域
+export const preferredRegion = 'auto';
+
+// 设置最大并发
 export const config = {
   runtime: 'edge'
 }
+
+// 启动缓存清理
+setupCacheCleanup();
 
 // --- App Setup ---
 // Remove the Env type parameter from Hono

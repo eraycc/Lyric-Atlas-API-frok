@@ -2,6 +2,8 @@ import { getLogger } from './utils';
 
 const logger = getLogger('Cache');
 
+// 确保缓存在Vercel Edge Functions环境中可用
+// 使用Map作为内存缓存，这在Edge Runtime中是完全支持的
 // 通用缓存接口
 interface CacheEntry<T> {
   data: T;
@@ -122,7 +124,7 @@ export const metadataCache = new Cache<any>('metadata', 30 * 60 * 1000, 2000);
 export const lyricsCache = new Cache<any>('lyrics', 60 * 60 * 1000, 1000);
 
 // 导出执行定期清理的函数
-export function setupCacheCleanup(intervalMs: number = 15 * 60 * 1000): NodeJS.Timeout {
+export function setupCacheCleanup(intervalMs: number = 15 * 60 * 1000): ReturnType<typeof setInterval> {
   logger.info(`Setting up cache cleanup interval: ${intervalMs}ms`);
   return setInterval(() => {
     metadataCache.cleanup();
