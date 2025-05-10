@@ -1,5 +1,6 @@
 {
   "name": "lyric-atlas-api",
+  "type": "module",
   "scripts": {
     "start": "vercel dev",
     "deploy": "vercel"
